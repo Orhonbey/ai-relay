@@ -32,8 +32,9 @@ fi
 if [ -f .gitignore ]; then
   grep -qxF '.relay_status' .gitignore || echo '.relay_status' >> .gitignore
   grep -qxF '.ai-relay.json' .gitignore || echo '.ai-relay.json' >> .gitignore
+  grep -qxF '.worktrees/' .gitignore || echo '.worktrees/' >> .gitignore
 else
-  printf '.relay_status\n.ai-relay.json\n' > .gitignore
+  printf '.relay_status\n.ai-relay.json\n.worktrees/\n' > .gitignore
 fi
 echo "  .gitignore updated"
 

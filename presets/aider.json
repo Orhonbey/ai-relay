@@ -8,6 +8,10 @@
   },
   "max_retries": 3,
   "status_file": ".relay_status",
+  "worktree": {
+    "enabled": true,
+    "base_dir": ".worktrees"
+  },
   "hooks": {
     "post_review": ""
   }

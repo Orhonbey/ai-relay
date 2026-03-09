@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ai-relay generic wrapper — config-driven AI CLI execution
-# Usage: ./relay-run.sh "prompt" [--continue [session_id]]
+# Usage: ./relay-run.sh [--worktree <path>] "prompt" [--continue [session_id]]
 
 set -euo pipefail
 
@@ -46,8 +46,24 @@ if [ -L "$STATUS_FILE" ]; then
   exit 1
 fi
 
+# Parse --worktree flag (must come before prompt)
+WORKTREE_DIR=""
+if [ "${1:-}" = "--worktree" ]; then
+  WORKTREE_DIR="${2:-}"
+  shift 2
+  if [ -z "$WORKTREE_DIR" ] || [ ! -d "$WORKTREE_DIR" ]; then
+    echo "ERROR: --worktree requires a valid directory path" >&2
+    exit 1
+  fi
+fi
+
 PROMPT="${1:-}"
 shift || true
+
+# Switch to worktree directory if provided
+if [ -n "$WORKTREE_DIR" ]; then
+  cd "$WORKTREE_DIR"
+fi
 
 echo "RUNNING" > "$STATUS_FILE"
 
