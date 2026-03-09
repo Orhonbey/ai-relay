@@ -107,6 +107,10 @@ See [docs/adding-a-preset.md](docs/adding-a-preset.md) for details.
 - Target AI CLI installed and accessible in PATH
 - Claude Code with slash command support
 
+## Author
+
+[Sunal Orhon](https://www.linkedin.com/in/sunalorhon/)
+
 ## License
 
 MIT
