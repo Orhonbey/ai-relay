@@ -1,0 +1,14 @@
+{
+  "cli": "YOUR_CLI_NAME",
+  "flags": {
+    "prompt": "",
+    "continue": "",
+    "session": "",
+    "workdir": ""
+  },
+  "max_retries": 3,
+  "status_file": ".relay_status",
+  "hooks": {
+    "post_review": ""
+  }
+}

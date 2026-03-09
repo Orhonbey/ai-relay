@@ -1,0 +1,14 @@
+{
+  "cli": "kimi",
+  "flags": {
+    "prompt": "--print --final-message-only -p",
+    "continue": "-C",
+    "session": "-S",
+    "workdir": "-w"
+  },
+  "max_retries": 3,
+  "status_file": ".relay_status",
+  "hooks": {
+    "post_review": ""
+  }
+}
