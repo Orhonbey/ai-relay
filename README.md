@@ -8,20 +8,22 @@ AI-agnostic task delegation for Claude Code. Delegate coding tasks to any AI CLI
 You (Claude Code)          ai-relay            Target AI CLI
     |                         |                      |
     |-- /relay "add X" ------>|                      |
-    |                         |-- prepare prompt     |
-    |                         |-- relay-run.sh ----->|
-    |                         |   (status: RUNNING)  |
+    |                         |-- minimal prompt     |
+    |                         |-- create worktree    |
+    |                         |-- relay-run.sh ----->|  (background)
+    |                         |                      |
+    |   (free to do other work)                      |-- reads repo
     |                         |                      |-- writes code
     |                         |                      |-- git commit
-    |                         |   (status: DONE) <---|
+    |                         |<-- notification -----|
     |                         |-- git diff review    |
-    |<-- report --------------|                      |
+    |<-- report + merge ------|                      |
 ```
 
 ## Install
 
 ```bash
-git clone https://github.com/SunalSpaciel/ai-relay.git
+git clone https://github.com/Orhonbey/ai-relay.git
 cd ai-relay
 
 # Install with a preset (e.g., kimi)
@@ -45,12 +47,23 @@ In Claude Code:
 ```
 
 Claude will:
-1. Analyze the task and read relevant code
-2. Prepare a detailed prompt
-3. Run the configured AI CLI via `relay-run.sh`
-4. Poll `.relay_status` until completion
-5. Review changes with `git diff`
-6. Report results (and optionally run quality gates)
+1. Prepare a minimal prompt (task + file paths only — no file content pasting)
+2. Create an isolated git worktree for the task
+3. Run the AI CLI in the background (Claude is free to do other work)
+4. Review changes with `git diff` when notified
+5. Report results and ask for merge approval
+6. Merge worktree branch on approval, cleanup on rejection
+
+### Parallel Relay
+
+Each task runs in its own worktree, so you can run multiple relays concurrently:
+
+```
+/relay "task A"  →  worktree-A  →  CLI instance 1
+/relay "task B"  →  worktree-B  →  CLI instance 2
+```
+
+Claude reviews and merges each independently when they complete.
 
 ## Config
 
@@ -65,6 +78,8 @@ Claude will:
 | `flags.workdir` | Flag to set working directory | `"-w"` |
 | `max_retries` | Max fix attempts per task | `3` |
 | `status_file` | Status file path | `".relay_status"` |
+| `worktree.enabled` | Enable git worktree isolation | `true` |
+| `worktree.base_dir` | Directory for worktrees | `".worktrees"` |
 | `hooks.post_review` | Post-review command (optional) | `"/simplify"` |
 
 ## Presets
