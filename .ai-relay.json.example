@@ -1,18 +1,18 @@
 {
-  "cli": "YOUR_CLI_NAME",
-  "flags": {
-    "prompt": "",
-    "continue": "",
-    "session": "",
-    "workdir": ""
+  "version": 3,
+  "plan": { "dir": "docs/relay-plans" },
+  "targets": {
+    "cc": { "preset": "commandcode", "model": "" },
+    "oc": { "preset": "opencode", "model": "" }
   },
+  "default_target": "cc",
+  "escalation": ["cc", "oc"],
   "max_retries": 3,
-  "status_file": ".relay_status",
-  "worktree": {
-    "enabled": true,
-    "base_dir": ".worktrees"
-  },
-  "hooks": {
-    "post_review": ""
-  }
+  "gates": [
+    { "name": "lint", "cmd": "npm run lint" },
+    { "name": "typecheck", "cmd": "npm run typecheck" },
+    { "name": "test", "cmd": "npm test" }
+  ],
+  "worktree": { "enabled": true, "base_dir": ".worktrees" },
+  "status_file": ".relay_status"
 }

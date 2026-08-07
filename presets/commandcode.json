@@ -1,0 +1,11 @@
+{
+  "cli": "commandcode",
+  "flags": {
+    "pre": "",
+    "model": "-m",
+    "prompt": "--skip-onboarding --max-turns 100 --yolo -p",
+    "continue": "-c",
+    "session": "--session",
+    "workdir": ""
+  }
+}

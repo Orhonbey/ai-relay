@@ -1,0 +1,11 @@
+{
+  "cli": "opencode",
+  "flags": {
+    "pre": "run",
+    "model": "-m",
+    "prompt": "--auto",
+    "continue": "-c",
+    "session": "-s",
+    "workdir": "--dir"
+  }
+}

@@ -1,6 +1,8 @@
 {
   "cli": "aider",
   "flags": {
+    "pre": "",
+    "model": "",
     "prompt": "--message",
     "continue": "",
     "session": "",

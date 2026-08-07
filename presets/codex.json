@@ -1,6 +1,8 @@
 {
   "cli": "codex",
   "flags": {
+    "pre": "",
+    "model": "",
     "prompt": "-q -p",
     "continue": "",
     "session": "",

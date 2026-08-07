@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Test fixture: records its argv and cwd, then exits with $FAKE_CLI_EXIT.
+# One argument per line so tests can assert exact ordering.
+set -u
+: > "$FAKE_CLI_LOG"
+for arg in "$@"; do
+  printf '%s\n' "$arg" >> "$FAKE_CLI_LOG"
+done
+printf 'cwd=%s\n' "$PWD" >> "$FAKE_CLI_LOG"
+exit "${FAKE_CLI_EXIT:-0}"
