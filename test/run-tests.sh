@@ -173,7 +173,26 @@ EOF
   rm -rf "$dir"
 }
 
-t1; t2; t3; t4; t5
+# --- Test 6: every preset declares the full flag schema
+t6() {
+  local f name missing
+  for f in "$REPO_ROOT"/presets/*.json; do
+    name="$(basename "$f" .json)"
+    if ! jq -e '.cli' "$f" >/dev/null 2>&1; then
+      fail "preset $name: missing .cli"; continue
+    fi
+    missing="$(jq -r '
+      ["pre","model","prompt","continue","session","workdir"]
+      - (.flags // {} | keys) | join(",")' "$f")"
+    if [ -n "$missing" ]; then
+      fail "preset $name: missing flag keys: $missing"
+    else
+      pass "preset $name: full flag schema"
+    fi
+  done
+}
+
+t1; t2; t3; t4; t5; t6
 
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

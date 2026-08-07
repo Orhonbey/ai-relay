@@ -1,6 +1,8 @@
 {
   "cli": "kimi",
   "flags": {
+    "pre": "",
+    "model": "",
     "prompt": "--print --final-message-only -p",
     "continue": "-C",
     "session": "-S",

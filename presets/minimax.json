@@ -1,6 +1,8 @@
 {
   "cli": "minimax",
   "flags": {
+    "pre": "",
+    "model": "",
     "prompt": "-p",
     "continue": "",
     "session": "",
