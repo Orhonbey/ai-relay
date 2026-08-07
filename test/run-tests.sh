@@ -192,7 +192,44 @@ t6() {
   done
 }
 
-t1; t2; t3; t4; t5; t6
+# --- Test 7: install.sh populates AI_RELAY_HOME and does not gitignore config
+t7() {
+  local dir; dir="$(mktemp -d)"
+  mkdir -p "$dir/project"
+  ( cd "$dir/project" \
+    && git init -q . \
+    && printf '.ai-relay.json\n.relay_status\n' > .gitignore \
+    && AI_RELAY_HOME="$dir/home" CLAUDE_HOME="$dir/claude" \
+       "$REPO_ROOT/install.sh" commandcode >/dev/null 2>&1 )
+
+  if [ -x "$dir/home/relay-run.sh" ]; then pass "install: runner is global and executable"
+  else fail "install: runner is global and executable"; fi
+
+  if [ -f "$dir/home/presets/opencode.json" ]; then pass "install: presets copied to AI_RELAY_HOME"
+  else fail "install: presets copied to AI_RELAY_HOME"; fi
+
+  if [ -f "$dir/project/.ai-relay.json" ]; then pass "install: project config created"
+  else fail "install: project config created"; fi
+
+  if grep -qxF '.ai-relay.json' "$dir/project/.gitignore"; then
+    fail "install: removes .ai-relay.json from .gitignore"
+  else
+    pass "install: removes .ai-relay.json from .gitignore"
+  fi
+
+  if grep -qxF '.relay_status' "$dir/project/.gitignore"; then
+    pass "install: keeps .relay_status ignored"
+  else fail "install: keeps .relay_status ignored"; fi
+
+  if [ -f "$dir/project/relay-run.sh" ]; then
+    fail "install: does not drop a runner into the project"
+  else
+    pass "install: does not drop a runner into the project"
+  fi
+  rm -rf "$dir"
+}
+
+t1; t2; t3; t4; t5; t6; t7
 
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]
