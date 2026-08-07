@@ -1,167 +1,174 @@
-# /relay — AI CLI Task Delegation
+# /relay — Plan-driven task delegation across AI CLIs
 
-Analyze the user's task and delegate it to the configured AI CLI.
+Plan the work with the user, delegate it to a target AI CLI, verify the result
+against objective gates, feed corrections back, and escalate to another model if
+the gates cannot be met.
 
 ## Input
-$ARGUMENTS — task description from the user
+$ARGUMENTS — the task description. If it starts with `--quick`, skip Phase 1.
 
 ## Configuration
 
-Read `.ai-relay.json` in the project root for CLI name, flags, and settings.
-If the file doesn't exist, tell the user to run install.sh first.
+Read `.ai-relay.json` from the project root. If it is missing, tell the user to
+run `install.sh` and stop.
 
-## Workflow
+- `version: 3` — full plan-driven loop (below).
+- No `version` key — legacy config. Run the v2 flow: skip Phase 1, use the single
+  implicit target, review the diff, no gates.
 
-### Step 1: Analyze and Prepare Prompt
-1. Analyze the task — which files are affected, what kind of change
-2. Identify the file paths to modify (do NOT read and paste file contents — the target CLI reads the repo itself)
-3. Prepare a minimal prompt for the target AI CLI
+Resolve the runner once: use `./relay-run.sh` if it exists (legacy install),
+otherwise `${AI_RELAY_HOME:-$HOME/.ai-relay}/relay-run.sh`. If neither exists,
+tell the user to run `install.sh` and stop.
 
-Use this prompt template:
+## Phase 1 — Plan
 
-```
-## Task
-[Clear, one-sentence task description]
+Skip this phase entirely when the user passed `--quick`.
 
-## Setup
-- Read all CLAUDE.md files in the repo before starting (root + subdirectories)
-- Follow the project's conventions and rules
+1. Explore the repo: which files does this touch, what conventions apply, what
+   already exists that this must fit.
+2. **Ask the user about every real technical choice**, one question at a time,
+   as multiple choice with your recommendation first and each option's cost
+   stated. Real choices are things like: data access model, test runner, lint
+   chain, a new dependency, CI scope, module boundaries, error-handling
+   strategy. Not real choices: variable names, ordering, formatting — decide
+   those yourself.
+3. Write the plan to `<plan.dir>/YYYY-MM-DD-<slug>.md` using
+   `templates/plan.md`. Every acceptance criterion must be verifiable either by
+   a gate command's output or by a single look at the diff. "The code should be
+   clean" is not a criterion; "`src/db.ts` throws `ConfigError` when `DB_URL` is
+   unset" is.
+4. Propose a target from `targets` based on the task, and ask the user to
+   approve **the plan and the target together**. This is the only approval gate
+   before work starts.
 
-## Files to Modify
-1. `path/to/file` — [what to change]
-2. `path/to/other` — [what to change]
+## Phase 2 — Dispatch
 
-## Rules
-- Only touch the specified files
-- Git add + git commit when done
-- Commit message format: type: description
+1. Create the worktree (when `worktree.enabled`):
 
-## Do NOT
-- Create unrelated files
-- Break existing tests
-- Add unnecessary dependencies
-```
-
-### Step 2: Create Worktree (if enabled)
-
-Read `worktree.enabled` from `.ai-relay.json`. If `true` (or if the `worktree` key exists and is enabled):
-
-1. Generate a short slug from the task description (lowercase, hyphens, max 30 chars)
-2. Create the worktree:
    ```bash
-   git worktree add .worktrees/relay-<slug> -b relay/<slug>
-   ```
-3. If the branch already exists, append a timestamp:
-   ```bash
-   git worktree add .worktrees/relay-<slug>-<timestamp> -b relay/<slug>-<timestamp>
+   git worktree add <base_dir>/relay-<slug> -b relay/<slug>
    ```
 
-If `worktree` config is missing or `enabled: false`, skip this step and run in the current directory (v1 behavior).
+   If the branch exists, append a timestamp to the slug. Record the base commit
+   (`git rev-parse HEAD` before branching) — Phase 5 resets to it.
 
-### Step 3: Execute AI CLI
+2. Build a **minimal** prompt. Do not paste the plan's contents; the model reads
+   the file itself.
 
-Run in the background:
-```bash
-# With worktree:
-./relay-run.sh --worktree .worktrees/relay-<slug> "PREPARED_PROMPT"
-
-# Without worktree (fallback):
-./relay-run.sh "PREPARED_PROMPT"
-```
-Use `run_in_background: true` for this Bash call. Claude is free to do other work while the task runs.
-
-When the background task completes, you will receive a notification automatically. Do NOT poll or check `.relay_status` — just wait for the notification.
-
-- If the task succeeded (exit 0) — proceed to Step 4
-- If the task failed (non-zero exit) — inform the user and check the output for errors. If worktree was used, keep it for inspection.
-
-### Step 4: Review
-
-If worktree was used, review from the worktree:
-```bash
-cd .worktrees/relay-<slug>
-git log --oneline -3
-git diff main..HEAD
-git diff --name-only main..HEAD
-```
-
-If no worktree (v1 fallback):
-```bash
-git log --oneline -3
-git diff HEAD~1 HEAD
-git diff --name-only HEAD~1 HEAD
-```
-
-Review the changes:
-- Is the code style correct?
-- Are tests present and sensible?
-- Any security issues?
-- Any unnecessary file changes?
-
-### Step 5: Report
-Inform the user:
-- What changed (file list + summary)
-- Any issues found
-- Ask for approval to merge (if worktree) or confirm completion (if no worktree)
-
-### Error Correction (Max retries from config, default 3)
-If issues are found during review:
-1. Clearly describe the problem
-2. Prepare a fix prompt (only the problematic part)
-3. Run with `run_in_background: true`:
-   ```bash
-   # With worktree:
-   ./relay-run.sh --worktree .worktrees/relay-<slug> "fix prompt" --continue
-
-   # Without worktree:
-   ./relay-run.sh "fix prompt" --continue
    ```
-4. Wait for notification, then review again
+   ## Task
+   <one sentence>
 
-If not fixed after max retries, give the user a status report.
+   ## Plan
+   `<absolute path to the plan file>` — read this file and follow it exactly.
+   The task is not done until every acceptance criterion in it is met.
 
-### Step 6: Merge or Reject (worktree only)
+   ## Setup
+   - Read every AGENTS.md / CLAUDE.md in the repo first
+   - Follow the project's conventions
 
-**On user approval:**
+   ## Rules
+   - Only touch files named in the plan
+   - git add + git commit when done
+   - Commit message: type(scope): summary
+   ```
+
+3. Run it in the background:
+
+   ```bash
+   <runner> --target <name> --worktree <base_dir>/relay-<slug> "<PROMPT>"
+   ```
+
+   Use `run_in_background: true`. Do not poll `.relay_status` — you are notified
+   on completion. You are free to do other work meanwhile.
+
+## Phase 3 — Gate
+
+Run every command in `gates` yourself, in the worktree, in order. Run all of
+them even after one fails, so a single round collects every finding. Read the
+actual output — never accept the model's claim that something passed.
+
+Then read `git diff <base>..HEAD` and check each acceptance criterion in the
+plan one by one.
+
+Report in this shape:
+
+```
+GATES
+  lint       PASS
+  typecheck  FAIL  src/db.ts:42  TS2345: ...
+  test       FAIL  2 failing (db.test.ts: "throws on missing URL")
+  build      NOT RUN  (not configured)
+
+ACCEPTANCE
+  PASS  1. ...
+  FAIL  3. ...  — no corresponding change in the diff
+```
+
+A gate that is not configured is reported as NOT RUN — never counted as passed.
+The result is PASS only when every gate passes **and** every criterion is met.
+
+## Phase 4 — Feedback
+
+On FAIL, write a specific correction prompt: which gate or criterion, the actual
+command output, `file:line`, and what is expected instead. Never write "fix the
+code".
+
+```bash
+<runner> --target <name> --worktree <path> "<FEEDBACK>" --continue
+```
+
+`--continue` keeps the model's session, so it still has its own context. Go back
+to Phase 3. Repeat at most `max_retries` times (default 3).
+
+## Phase 5 — Escalate
+
+When retries are exhausted:
+
+1. Reset the worktree to the base commit recorded in Phase 2 — not to `main`,
+   which may have moved. The next model must not inherit half-finished work.
+2. Pick the next entry in `escalation`, skipping targets already tried.
+3. Dispatch as in Phase 2, adding a handover note: which gates broke, with what
+   output, and what the previous model attempted.
+4. Tell the user that the task was handed over and to which target. They may
+   stop the loop here.
+
+If `escalation` is exhausted, stop and report everything that was tried.
+
+## Phase 6 — Accept
+
+On PASS, report: files changed, each gate's output, how many rounds it took,
+which target finished it. Ask the user to approve the merge.
+
+**On approval:**
+
 ```bash
 git merge relay/<slug>
-git worktree remove .worktrees/relay-<slug>
+git worktree remove <base_dir>/relay-<slug>
 git branch -d relay/<slug>
 ```
 
-**On user rejection:**
+**On rejection:**
+
 ```bash
-git worktree remove .worktrees/relay-<slug> --force
+git worktree remove <base_dir>/relay-<slug> --force
 git branch -D relay/<slug>
 ```
 
-**On merge conflict:**
-Do NOT auto-resolve. Report the conflict to the user with details and let them decide how to proceed.
+**On merge conflict:** do not resolve it. Report it and let the user decide.
 
-If no worktree was used, skip this step entirely.
+## Parallel relays
 
-### Step 7: Quality Gate (After All Tasks Complete)
+Each task gets its own worktree and branch, so several relays can run at once.
+If two in-flight relays name overlapping files in their plans, warn the user —
+do not block.
 
-Read `hooks.post_review` from `.ai-relay.json`. If it is set (non-empty):
+## Failure handling
 
-1. Run the configured post-review hook (e.g., `/simplify`, security review)
-2. Collect findings and prioritize (critical > high > medium)
-3. If critical/high findings exist, delegate fixes:
-   ```bash
-   ./relay-run.sh "FIX_PROMPT" --continue
-   ```
-   Use `run_in_background: true`. Include findings list and which files need fixing.
-   Wait for notification, then review again (max 2 rounds)
-4. If clean — inform user: "Quality gate passed, ready to push"
-
-If `hooks.post_review` is empty or not set, skip this step.
-
-## Session Strategy
-
-| Scenario | Command | Description |
-|----------|---------|-------------|
-| New task | `./relay-run.sh "prompt"` | Start fresh session |
-| New task (worktree) | `./relay-run.sh --worktree <path> "prompt"` | Isolated session |
-| Fix (same task) | `./relay-run.sh "fix" --continue` | Continue last session |
-| Fix (worktree) | `./relay-run.sh --worktree <path> "fix" --continue` | Continue in worktree |
-| Specific session | `./relay-run.sh "prompt" --continue session_id` | Resume by session ID |
+| Situation | What to do |
+|---|---|
+| Runner exits non-zero | Keep the worktree for inspection; report the output |
+| Branch already exists | Append a timestamp to the slug |
+| Target not in roster | Stop; list the available targets |
+| Plan file unreadable by the model | Pass the plan path as an absolute path |
+| `gates` empty | Report every gate as NOT RUN and say so in the summary |
